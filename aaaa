@@ -1,9 +1,8 @@
--- USING FOR TEST DO NOT EXCUTE IT
+-- USING FOR TEST DO NOT EXECUTE IT
 local validKeys = {
      "RI3-X9J-WQD-UAZ"
 }
 
--- Lấy key từ môi trường global (được yêu cầu do bạn muốn nhập key ngoài script)
 local userKey = getgenv().Key or ""
 
 local function isValidKey(k)
@@ -15,7 +14,6 @@ local function isValidKey(k)
 end
 
 if not isValidKey(userKey) then
-    -- Thông báo nhẹ: key không hợp lệ -> dừng script
     pcall(function()
         local StarterGui = game:GetService("StarterGui")
         StarterGui:SetCore("SendNotification", {
@@ -27,15 +25,10 @@ if not isValidKey(userKey) then
     return
 end
 
--- Nếu cần loadstring script chính (comment/placeholder):
--- loadstring(game:HttpGet("https://your-script-source-here.com/script.lua"))()
-
--- ===================== TẠO GIAO DIỆN =====================
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Clear previous GUI with same name (an toàn khi dùng executor nhiều lần)
 local existing = PlayerGui:FindFirstChild("TinyToggleMenu")
 if existing then existing:Destroy() end
 
@@ -44,28 +37,25 @@ screenGui.Name = "TinyToggleMenu"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = PlayerGui
 
--- ---------- Small Square (avatar-like) ----------
 local smallFrame = Instance.new("ImageButton")
 smallFrame.Name = "SmallMenuButton"
-smallFrame.Size = UDim2.fromOffset(56,56) -- vuông nhỏ
-smallFrame.Position = UDim2.new(0, 20, 0.3, 0) -- mặc định bên trái
+smallFrame.Size = UDim2.fromOffset(56,56)
+smallFrame.Position = UDim2.new(0, 20, 0.3, 0)
 smallFrame.AnchorPoint = Vector2.new(0,0)
 smallFrame.BackgroundTransparency = 1
-smallFrame.Image = "rbxassetid://108648849330242" -- ID do bạn cung cấp
+smallFrame.Image = "rbxassetid://108648849330242"
 smallFrame.Parent = screenGui
 
--- bóng nhỏ
 local smallUICorner = Instance.new("UICorner")
 smallUICorner.CornerRadius = UDim.new(0.12)
 smallUICorner.Parent = smallFrame
 
--- ---------- Big Menu (ẩn mặc định) ----------
 local bigFrame = Instance.new("Frame")
 bigFrame.Name = "BigMenu"
 bigFrame.Size = UDim2.fromOffset(520, 360)
 bigFrame.Position = UDim2.new(0.5, -260, 0.5, -180)
 bigFrame.AnchorPoint = Vector2.new(0.5,0.5)
-bigFrame.BackgroundColor3 = Color3.fromRGB(10,10,10) -- nền đen
+bigFrame.BackgroundColor3 = Color3.fromRGB(10,10,10)
 bigFrame.BackgroundTransparency = 0
 bigFrame.Visible = false
 bigFrame.Parent = screenGui
@@ -74,7 +64,6 @@ local bigUICorner = Instance.new("UICorner")
 bigUICorner.CornerRadius = UDim.new(0.03)
 bigUICorner.Parent = bigFrame
 
--- Top bar (dùng để kéo)
 local topBar = Instance.new("Frame")
 topBar.Name = "TopBar"
 topBar.Size = UDim2.new(1,0,0,34)
@@ -82,7 +71,6 @@ topBar.Position = UDim2.new(0,0,0,0)
 topBar.BackgroundTransparency = 1
 topBar.Parent = bigFrame
 
--- Close X button
 local closeBtn = Instance.new("TextButton")
 closeBtn.Name = "CloseBtn"
 closeBtn.Size = UDim2.fromOffset(26,26)
@@ -100,7 +88,6 @@ local closeCorner = Instance.new("UICorner")
 closeCorner.CornerRadius = UDim.new(0.25)
 closeCorner.Parent = closeBtn
 
--- Title label
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Name = "Title"
 titleLabel.Size = UDim2.new(0.5,0,0,34)
@@ -113,7 +100,57 @@ titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 18
 titleLabel.Parent = topBar
 
--- Left tab list
+-- ========== Start Match Toggle on TopBar ==========
+local startMatchBtn = Instance.new("TextButton")
+startMatchBtn.Name = "StartMatchBtn"
+startMatchBtn.Size = UDim2.fromOffset(100,26)
+startMatchBtn.Position = UDim2.new(0, 150, 0, 4)
+startMatchBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+startMatchBtn.Text = "Start Match [OFF]"
+startMatchBtn.Font = Enum.Font.GothamBold
+startMatchBtn.TextSize = 13
+startMatchBtn.TextColor3 = Color3.fromRGB(220,220,220)
+startMatchBtn.Parent = topBar
+
+local smCorner = Instance.new("UICorner")
+smCorner.CornerRadius = UDim.new(0.2)
+smCorner.Parent = startMatchBtn
+
+local vim = game:GetService("VirtualInputManager")
+local matchOn = false
+local matchDone = false
+
+local function pressKey(keyCode)
+    vim:SendKeyEvent(true, keyCode, false, game)
+    task.wait(0.1)
+    vim:SendKeyEvent(false, keyCode, false, game)
+    task.wait(0.1)
+end
+
+startMatchBtn.MouseButton1Click:Connect(function()
+    matchOn = not matchOn
+    if matchOn then
+        startMatchBtn.Text = "Start Match [ON]"
+        if not matchDone then
+            matchDone = true
+            local args = {
+                [1] = "Add",
+                [2] = 3
+            }
+            game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("TeleportEvent"):FireServer(unpack(args))
+            -- nhấn \, s x3, Enter
+            pressKey(Enum.KeyCode.BackSlash)
+            pressKey(Enum.KeyCode.S)
+            pressKey(Enum.KeyCode.S)
+            pressKey(Enum.KeyCode.S)
+            pressKey(Enum.KeyCode.Return)
+        end
+    else
+        startMatchBtn.Text = "Start Match [OFF]"
+    end
+end)
+
+-- ========== Tabs ==========
 local tabList = Instance.new("Frame")
 tabList.Name = "TabList"
 tabList.Size = UDim2.new(0,120,1, -46)
@@ -140,7 +177,6 @@ local mainTabBtn = makeTabButton("Main", 0)
 local farmTabBtn = makeTabButton("Farm", 48)
 local infoTabBtn = makeTabButton("Info", 96)
 
--- Content area
 local contentArea = Instance.new("Frame")
 contentArea.Name = "ContentArea"
 contentArea.Size = UDim2.new(1, -144, 1, -56)
@@ -148,7 +184,6 @@ contentArea.Position = UDim2.new(0,136,0,46)
 contentArea.BackgroundTransparency = 1
 contentArea.Parent = bigFrame
 
--- Helper to create panels
 local function makePanel(name)
     local p = Instance.new("Frame")
     p.Name = name.."Panel"
@@ -162,11 +197,8 @@ end
 local mainPanel = makePanel("Main")
 local farmPanel = makePanel("Farm")
 local infoPanel = makePanel("Info")
-
--- Default: show Main
 mainPanel.Visible = true
 
--- Fill Main panel with some example buttons/info
 local welcome = Instance.new("TextLabel")
 welcome.Size = UDim2.new(1, -20, 0, 60)
 welcome.Position = UDim2.new(0,10,0,10)
@@ -179,68 +211,8 @@ welcome.Font = Enum.Font.Gotham
 welcome.TextSize = 14
 welcome.Parent = mainPanel
 
-local exampleBtn = Instance.new("TextButton")
-exampleBtn.Size = UDim2.new(0,140,0,36)
-exampleBtn.Position = UDim2.new(0,10,0,84)
-exampleBtn.Text = "Do Something"
-exampleBtn.Font = Enum.Font.Gotham
-exampleBtn.TextSize = 14
-exampleBtn.Parent = mainPanel
-local exCorner = Instance.new("UICorner") exCorner.Parent = exampleBtn
+-- [ĐÃ XOÁ nút Do Something ở đây]
 
-exampleBtn.MouseButton1Click:Connect(function()
-    pcall(function()
-        game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = "Action";
-            Text = "Bạn vừa nhấn nút Do Something";
-            Duration = 4;
-        })
-    end)
-end)
-
--- ================== THÊM NÚT START MATCH ==================
-local startMatchBtn = Instance.new("TextButton")
-startMatchBtn.Size = UDim2.new(0,100,0,36)
-startMatchBtn.Position = UDim2.new(0,10,0,132)
-startMatchBtn.Text = "Start Match: OFF"
-startMatchBtn.Font = Enum.Font.Gotham
-startMatchBtn.TextSize = 14
-startMatchBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-startMatchBtn.TextColor3 = Color3.fromRGB(230,230,230)
-startMatchBtn.Parent = mainPanel
-local smCorner = Instance.new("UICorner") smCorner.Parent = startMatchBtn
-
-local matchStarted = false
-local VirtualInputManager = game:GetService("VirtualInputManager")
-
-local function pressKey(keyCode)
-    VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
-    task.wait(0.05)
-    VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
-    task.wait(0.1)
-end
-
-startMatchBtn.MouseButton1Click:Connect(function()
-    if matchStarted then return end -- chỉ chạy 1 lần duy nhất
-    matchStarted = true
-    startMatchBtn.Text = "Start Match: ON"
-    -- FireServer
-    local args = {
-        [1] = "Add",
-        [2] = 3
-    }
-    game:GetService("ReplicatedStorage"):WaitForChild("RemoteEvents"):WaitForChild("TeleportEvent"):FireServer(unpack(args))
-    -- Giả lập gõ phím
-    pressKey(Enum.KeyCode.Slash)
-    pressKey(Enum.KeyCode.S)
-    pressKey(Enum.KeyCode.S)
-    pressKey(Enum.KeyCode.S)
-    pressKey(Enum.KeyCode.Return)
-end)
-
--- ================== END START MATCH ==================
-
--- Farm panel example: a toggle and a speed slider (mock)
 local farmLabel = Instance.new("TextLabel")
 farmLabel.Size = UDim2.new(1, -20, 0, 30)
 farmLabel.Position = UDim2.new(0,10,0,10)
@@ -264,7 +236,6 @@ local farming = false
 farmToggle.MouseButton1Click:Connect(function()
     farming = not farming
     farmToggle.Text = farming and "Stop Farm" or "Start Farm"
-    -- placeholder: thực tế bạn sẽ gắn hàm farm ở đây
     if farming then
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "Farm";
@@ -280,7 +251,6 @@ farmToggle.MouseButton1Click:Connect(function()
     end
 end)
 
--- Info panel: show some sample info
 local infoText = Instance.new("TextLabel")
 infoText.Size = UDim2.new(1, -20, 1, -20)
 infoText.Position = UDim2.new(0,10,0,10)
@@ -294,7 +264,6 @@ infoText.Font = Enum.Font.Gotham
 infoText.TextSize = 14
 infoText.Parent = infoPanel
 
--- Tab switching
 local function showPanel(panel)
     mainPanel.Visible = false
     farmPanel.Visible = false
@@ -306,12 +275,10 @@ mainTabBtn.MouseButton1Click:Connect(function() showPanel(mainPanel) end)
 farmTabBtn.MouseButton1Click:Connect(function() showPanel(farmPanel) end)
 infoTabBtn.MouseButton1Click:Connect(function() showPanel(infoPanel) end)
 
--- Close button behavior
 closeBtn.MouseButton1Click:Connect(function()
     bigFrame.Visible = false
 end)
 
--- ---------- Dragging functionality for bigFrame and smallFrame ----------
 local UserInputService = game:GetService("UserInputService")
 
 local function makeDraggable(frame, dragHandle)
@@ -353,7 +320,6 @@ end
 makeDraggable(bigFrame, topBar)
 makeDraggable(smallFrame)
 
--- ---------- Toggle behavior: click small square to open/close big menu ----------
 smallFrame.MouseButton1Click:Connect(function()
     bigFrame.Visible = not bigFrame.Visible
 end)
