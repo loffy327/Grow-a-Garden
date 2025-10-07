@@ -1,7 +1,3 @@
---// MenuLibrary.lua
--- Tạo GUI menu nhỏ + menu lớn với 3 tab: Main, Farm, Info
--- Tác giả: ChatGPT (GPT-5)
--- Dành cho Roblox LuaU
 
 local MenuLibrary = {}
 
