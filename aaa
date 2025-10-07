@@ -1,7 +1,6 @@
-
+-- MenuLibrary.lua
 local MenuLibrary = {}
 
--- Hàm khởi tạo GUI
 function MenuLibrary:CreateMenu(player)
 	local playerGui = player:WaitForChild("PlayerGui")
 
@@ -33,7 +32,6 @@ function MenuLibrary:CreateMenu(player)
 	mainMenu.Draggable = true
 	mainMenu.Parent = smallMenu
 
-	-- Giao diện mềm mại
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 12)
 	corner.Parent = mainMenu
@@ -45,7 +43,6 @@ function MenuLibrary:CreateMenu(player)
 
 	-- Nút đóng
 	local closeBtn = Instance.new("TextButton")
-	closeBtn.Name = "CloseButton"
 	closeBtn.Text = "X"
 	closeBtn.Font = Enum.Font.GothamBold
 	closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -58,7 +55,7 @@ function MenuLibrary:CreateMenu(player)
 	cornerX.CornerRadius = UDim.new(0, 6)
 	cornerX.Parent = closeBtn
 
-	-- Thanh tiêu đề
+	-- Tiêu đề
 	local title = Instance.new("TextLabel")
 	title.Text = "✨ MENU ✨"
 	title.Font = Enum.Font.GothamBold
@@ -83,7 +80,9 @@ function MenuLibrary:CreateMenu(player)
 	pagesHolder.BackgroundTransparency = 1
 	pagesHolder.Parent = mainMenu
 
+	local tabCount = 0
 	local function createTab(name)
+		tabCount += 1
 		local btn = Instance.new("TextButton")
 		btn.Text = name
 		btn.Font = Enum.Font.GothamBold
@@ -91,7 +90,7 @@ function MenuLibrary:CreateMenu(player)
 		btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 		btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 		btn.Size = UDim2.new(1, -10, 0, 30)
-		btn.Position = UDim2.new(0, 0, 0, (#tabHolder:GetChildren() - 1) * 35)
+		btn.Position = UDim2.new(0, 0, 0, (tabCount - 1) * 35)
 		btn.Parent = tabHolder
 
 		local cornerT = Instance.new("UICorner")
@@ -127,11 +126,11 @@ function MenuLibrary:CreateMenu(player)
 	local farmTab = createTab("Farm")
 	local infoTab = createTab("Info")
 
-	-- Mặc định hiển thị Main
-	mainTab:Activate()
+	-- Tab mặc định
+	mainTab.BackgroundColor3 = Color3.fromRGB(60,60,60)
 	pagesHolder:FindFirstChild("MainPage").Visible = true
 
-	-- ========== KẾT NỐI ==========
+	-- Kết nối
 	smallButton.MouseButton1Click:Connect(function()
 		mainMenu.Visible = not mainMenu.Visible
 	end)
@@ -141,6 +140,7 @@ function MenuLibrary:CreateMenu(player)
 	end)
 
 	print("[MenuLibrary] Menu đã khởi tạo thành công.")
+	return mainMenu
 end
 
 return MenuLibrary
