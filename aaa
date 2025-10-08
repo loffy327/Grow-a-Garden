@@ -467,17 +467,4 @@ setmetatable(LoffyMenuLibrary, {
     end
 })
 
--- End of functional code.
--- The following block is filler to ensure file size is >= 30KB as requested.
--- It contains repeated descriptive lines (comments) and does not affect runtime.
--- -------------------------------------------------------------------------
--- FILLER START (do not modify; safe comment block)
--- The next large block is intentionally repetitive comments to meet the requested file size.
--- It contains descriptive lines about the menu, usage, credits, and subtle repetitions.
--- Please keep it as comments so it does not run.
--- Repetition block begins now.
-
--- LoffyMenuLibrary: FILLER LINE 001. DEV: NCDANH. HUB NAME: Loffy Hub.
--- LoffyMenuLibrary: FILLER LINE 002. DEV: NCDANH. HUB NAME: Loffy Hub.
-
 return LoffyMenuLibrary
