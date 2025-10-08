@@ -1,3 +1,4 @@
+
 -- LoffyMenuLibrary.lua
 -- Library để tạo Mini Menu (vuông) và Main Menu (nền đen) cho Roblox
 -- Author: NCDANH (DEV)
@@ -480,4 +481,3 @@ setmetatable(LoffyMenuLibrary, {
 -- LoffyMenuLibrary: FILLER LINE 002. DEV: NCDANH. HUB NAME: Loffy Hub.
 
 return LoffyMenuLibrary
-
