@@ -1,0 +1,574 @@
+-- LoffyMenuLibrary.lua
+-- Author: NCDANH
+-- Hub: Loffy Hub
+-- Purpose: Library to create a draggable mini avatar menu and a main menu with tabs: Main, Farm, Info
+-- Usage:
+-- local LoffyMenuLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/.../MenuLibrary.lua"))()
+-- local menuAPI = LoffyMenuLibrary:CreateMenu(game.Players.LocalPlayer)
+
+local LoffyMenuLibrary = {}
+LoffyMenuLibrary.__index = LoffyMenuLibrary
+
+-- Services
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- Default config (tweak as wanted)
+local CONFIG = {
+    MiniImage = "rbxassetid://108648849330242",
+    MiniSize = UDim2.new(0, 60, 0, 60),
+    MiniPosition = UDim2.new(0.02, 0, 0.12, 0),
+    MainSize = UDim2.new(0, 520, 0, 360),
+    MainPosition = UDim2.new(0.5, -260, 0.5, -180),
+    OverlayTransparency = 0.36,
+    TweenInfoShort = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+    TweenInfoMedium = TweenInfo.new(0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+    TopbarHeight = 44
+}
+
+-- Helper to create instances quickly
+local function new(class, props)
+    local inst = Instance.new(class)
+    if props then
+        for k, v in pairs(props) do
+            if k == "Parent" then
+                inst.Parent = v
+            else
+                inst[k] = v
+            end
+        end
+    end
+    return inst
+end
+
+-- Utility: safe UI tween
+local function tween(obj, props, tinfo)
+    tinfo = tinfo or CONFIG.TweenInfoShort
+    local ok, err = pcall(function()
+        local tw = TweenService:Create(obj, tinfo, props)
+        tw:Play()
+    end)
+    if not ok then
+        warn("[LoffyMenuLibrary] Tween error:", tostring(err))
+    end
+end
+
+-- Utility: style helpers
+local function addUICorner(parent, radius)
+    local u = Instance.new("UICorner")
+    u.CornerRadius = radius or UDim.new(0, 8)
+    u.Parent = parent
+    return u
+end
+
+local function addUIStroke(parent, thickness, transparency)
+    local s = Instance.new("UIStroke")
+    s.Thickness = thickness or 1
+    s.Transparency = transparency or 0.7
+    s.Parent = parent
+    return s
+end
+
+local function addGradient(parent, c1, c2, rot)
+    local g = Instance.new("UIGradient")
+    g.Color = ColorSequence.new{ ColorSequenceKeypoint.new(0, c1 or Color3.fromRGB(30,30,30)),
+                                 ColorSequenceKeypoint.new(1, c2 or Color3.fromRGB(18,18,18)) }
+    g.Rotation = rot or 90
+    g.Parent = parent
+    return g
+end
+
+-- Safe draggable implementation (works for mouse & touch)
+local function makeDraggable(targetFrame, dragHandle)
+    dragHandle = dragHandle or targetFrame
+    local dragging = false
+    local dragInput, dragStart, startPos
+
+    local function update(input)
+        if not (dragging and input and input.Position and startPos) then return end
+        local delta = input.Position - dragStart
+        -- prevent setting invalid positions
+        if not startPos then return end
+        local newX = startPos.X.Offset + delta.X
+        local newY = startPos.Y.Offset + delta.Y
+        -- assign new position preserving scale
+        targetFrame.Position = UDim2.new(startPos.X.Scale, newX, startPos.Y.Scale, newY)
+    end
+
+    dragHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = targetFrame.Position
+            -- connect changed for end
+            local conn
+            conn = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                    conn:Disconnect()
+                end
+            end)
+        end
+    end)
+
+    dragHandle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+
+    -- Use UserInputService to track movement (works on both mouse & touch)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            pcall(update, input)
+        end
+    end)
+end
+
+-- Build main UI for a player (returns screenGui and API table)
+function LoffyMenuLibrary:_buildUI(player)
+    if not player or not player:IsA("Player") then
+        return nil, "invalid player"
+    end
+
+    local playerGui = player:FindFirstChildOfClass("PlayerGui")
+    if not playerGui then
+        return nil, "playergui not found"
+    end
+
+    -- Avoid duplicate
+    local existing = playerGui:FindFirstChild("LoffyMenuRoot")
+    if existing then
+        return existing, "already exists"
+    end
+
+    -- Root ScreenGui
+    local screenGui = new("ScreenGui", {Name = "LoffyMenuRoot", ResetOnSpawn = false, Parent = playerGui})
+    -- Overlay (dark background)
+    local overlay = new("Frame", {
+        Name = "Overlay",
+        Parent = screenGui,
+        AnchorPoint = Vector2.new(0, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundColor3 = Color3.fromRGB(0,0,0),
+        BackgroundTransparency = CONFIG.OverlayTransparency,
+        ZIndex = 2,
+        Visible = false
+    })
+
+    -- Main window container (centered by default)
+    local mainFrame = new("Frame", {
+        Name = "MainWindow",
+        Parent = overlay,
+        Size = CONFIG.MainSize,
+        Position = CONFIG.MainPosition,
+        BackgroundColor3 = Color3.fromRGB(18,18,18),
+        BackgroundTransparency = 0,
+        ZIndex = 3,
+    })
+    addUICorner(mainFrame, UDim.new(0, 12))
+    addGradient(mainFrame, Color3.fromRGB(34,34,34), Color3.fromRGB(18,18,18), 90)
+    addUIStroke(mainFrame, 1, 0.8)
+
+    -- Top bar for dragging and title
+    local topBar = new("Frame", {
+        Name = "TopBar",
+        Parent = mainFrame,
+        Size = UDim2.new(1, 0, 0, CONFIG.TopbarHeight),
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundTransparency = 1,
+        ZIndex = 4
+    })
+    -- title label
+    local title = new("TextLabel", {
+        Name = "Title",
+        Parent = topBar,
+        Position = UDim2.new(0, 12, 0, 8),
+        Size = UDim2.new(0.6, 0, 1, -12),
+        BackgroundTransparency = 1,
+        Text = "Loffy Hub",
+        TextColor3 = Color3.fromRGB(240,240,240),
+        Font = Enum.Font.GothamBold,
+        TextSize = 18,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 5
+    })
+
+    -- Close button
+    local closeBtn = new("TextButton", {
+        Name = "CloseBtn",
+        Parent = topBar,
+        Size = UDim2.new(0, 40, 0, 28),
+        Position = UDim2.new(1, -48, 0, 8),
+        BackgroundColor3 = Color3.fromRGB(210,70,70),
+        Text = "X",
+        TextColor3 = Color3.fromRGB(255,255,255),
+        Font = Enum.Font.GothamBold,
+        TextSize = 18,
+        ZIndex = 6
+    })
+    addUICorner(closeBtn, UDim.new(0, 8))
+
+    -- Body: left tabs and right content
+    local body = new("Frame", {
+        Name = "Body",
+        Parent = mainFrame,
+        Position = UDim2.new(0, 12, 0, CONFIG.TopbarHeight + 8),
+        Size = UDim2.new(1, -24, 1, -CONFIG.TopbarHeight - 20),
+        BackgroundTransparency = 1,
+        ZIndex = 4
+    })
+
+    -- Tabs list
+    local tabsList = new("Frame", {
+        Name = "TabsList",
+        Parent = body,
+        Size = UDim2.new(0, 140, 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundTransparency = 1,
+        ZIndex = 4
+    })
+    local tabsLayout = Instance.new("UIListLayout", tabsList)
+    tabsLayout.Padding = UDim.new(0, 10)
+    tabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    tabsLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+    tabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    -- Content holder
+    local contentHolder = new("Frame", {
+        Name = "PagesHolder",
+        Parent = body,
+        Size = UDim2.new(1, -150, 1, 0),
+        Position = UDim2.new(0, 150, 0, 0),
+        BackgroundTransparency = 1,
+        ZIndex = 4
+    })
+
+    -- Helper: create a tab button
+    local function createTabButton(text)
+        local btn = new("TextButton", {
+            Name = text .. "TabBtn",
+            Parent = tabsList,
+            Size = UDim2.new(1, -10, 0, 44),
+            BackgroundColor3 = Color3.fromRGB(30,30,30),
+            Text = text,
+            TextColor3 = Color3.fromRGB(235,235,235),
+            Font = Enum.Font.Gotham,
+            TextSize = 14,
+            AutoButtonColor = true
+        })
+        addUICorner(btn, UDim.new(0, 10))
+        addUIStroke(btn, 1, 0.85)
+        return btn
+    end
+
+    -- Page management
+    local pages = {}   -- pages[name] = frame
+    local buttonsMap = {} -- keep track of tab buttons
+
+    local function hideAllPages()
+        for name,fr in pairs(pages) do
+            if fr and fr:IsA("Frame") then
+                fr.Visible = false
+            end
+        end
+    end
+
+    local function createPage(name)
+        local fr = new("Frame", {
+            Name = name .. "Page",
+            Parent = contentHolder,
+            Size = UDim2.new(1, 0, 1, 0),
+            BackgroundTransparency = 1,
+            Visible = false
+        })
+        pages[name] = fr
+        return fr
+    end
+
+    local function addTab(name)
+        if pages[name] then return end
+        local btn = createTabButton(name)
+        local page = createPage(name)
+
+        btn.MouseButton1Click:Connect(function()
+            hideAllPages()
+            page.Visible = true
+        end)
+
+        buttonsMap[name] = btn
+        return page, btn
+    end
+
+    -- Create default tabs: Main, Farm, Info
+    local defaultTabs = {"Main", "Farm", "Info"}
+    for _, tname in ipairs(defaultTabs) do
+        addTab(tname)
+    end
+
+    -- Fill default content for Main
+    do
+        local page = pages["Main"]
+        if page then
+            page.Visible = true -- default visible page when menu opens
+            local header = new("TextLabel", {
+                Parent = page,
+                Size = UDim2.new(1, -10, 0, 28),
+                Position = UDim2.new(0, 8, 0, 6),
+                BackgroundTransparency = 1,
+                Text = "Welcome to Loffy Hub",
+                Font = Enum.Font.GothamBold,
+                TextSize = 18,
+                TextColor3 = Color3.fromRGB(240,240,240),
+                TextXAlignment = Enum.TextXAlignment.Left
+            })
+
+            local about = new("TextLabel", {
+                Parent = page,
+                Size = UDim2.new(1, -16, 0, 80),
+                Position = UDim2.new(0, 8, 0, 40),
+                BackgroundTransparency = 1,
+                Text = "DEV: NCDANH\nHUB NAME: Loffy Hub\n\nThis is the Main page. Replace with your features.",
+                Font = Enum.Font.Gotham,
+                TextSize = 14,
+                TextColor3 = Color3.fromRGB(210,210,210),
+                TextWrapped = true,
+                TextYAlignment = Enum.TextYAlignment.Top
+            })
+        end
+    end
+
+    -- Fill Farm tab example
+    do
+        local page = pages["Farm"]
+        if page then
+            local label = new("TextLabel", {
+                Parent = page,
+                Size = UDim2.new(1, -16, 0, 28),
+                Position = UDim2.new(0, 8, 0, 8),
+                BackgroundTransparency = 1,
+                Text = "Farm Controls",
+                Font = Enum.Font.GothamBold,
+                TextSize = 16,
+                TextColor3 = Color3.fromRGB(240,240,240),
+                TextXAlignment = Enum.TextXAlignment.Left
+            })
+
+            -- Example toggle button
+            local toggle = new("TextButton", {
+                Parent = page,
+                Size = UDim2.new(0, 160, 0, 36),
+                Position = UDim2.new(0, 8, 0, 52),
+                BackgroundColor3 = Color3.fromRGB(45,45,45),
+                Text = "Farm: OFF",
+                Font = Enum.Font.Gotham,
+                TextSize = 14,
+                TextColor3 = Color3.fromRGB(240,240,240)
+            })
+            addUICorner(toggle, UDim.new(0, 8))
+
+            local farmOn = false
+            toggle.MouseButton1Click:Connect(function()
+                farmOn = not farmOn
+                if farmOn then
+                    toggle.Text = "Farm: ON"
+                    toggle.BackgroundColor3 = Color3.fromRGB(60,160,60)
+                else
+                    toggle.Text = "Farm: OFF"
+                    toggle.BackgroundColor3 = Color3.fromRGB(45,45,45)
+                end
+            end)
+        end
+    end
+
+    -- Fill Info tab example
+    do
+        local page = pages["Info"]
+        if page then
+            local label = new("TextLabel", {
+                Parent = page,
+                Size = UDim2.new(1, -16, 0, 28),
+                Position = UDim2.new(0, 8, 0, 8),
+                BackgroundTransparency = 1,
+                Text = "Information",
+                Font = Enum.Font.GothamBold,
+                TextSize = 16,
+                TextColor3 = Color3.fromRGB(240,240,240),
+                TextXAlignment = Enum.TextXAlignment.Left
+            })
+
+            local infoText = new("TextLabel", {
+                Parent = page,
+                Size = UDim2.new(1, -16, 1, -44),
+                Position = UDim2.new(0, 8, 0, 44),
+                BackgroundTransparency = 1,
+                Text = "DEV: NCDANH\nHUB: Loffy Hub\n\nLoffy Hub is a demo hub with a draggable UI and tabs for Main, Farm and Info.",
+                Font = Enum.Font.Gotham,
+                TextSize = 14,
+                TextColor3 = Color3.fromRGB(210,210,210),
+                TextWrapped = true,
+                TextYAlignment = Enum.TextYAlignment.Top
+            })
+        end
+    end
+
+    -- Make main draggable using topBar
+    makeDraggable(mainFrame, topBar)
+
+    -- Mini Menu (ImageButton) as separate ScreenGui so it stays visible even when main overlay hidden
+    local miniGui = new("ScreenGui", {Name = "LoffyMiniGui", ResetOnSpawn = false, Parent = playerGui})
+    local miniBtn = new("ImageButton", {
+        Name = "MiniMenu",
+        Parent = miniGui,
+        Size = CONFIG.MiniSize,
+        Position = CONFIG.MiniPosition,
+        BackgroundColor3 = Color3.fromRGB(28,28,28),
+        BackgroundTransparency = 0,
+        Image = CONFIG.MiniImage,
+        ScaleType = Enum.ScaleType.Fit,
+        ZIndex = 10
+    })
+    addUICorner(miniBtn, UDim.new(0, 12))
+    addUIStroke(miniBtn, 1, 0.85)
+
+    -- make mini draggable
+    makeDraggable(miniBtn)
+
+    -- Toggle behavior when clicking miniBtn
+    local function showMain()
+        if not overlay.Visible then
+            overlay.Visible = true
+            overlay.BackgroundTransparency = 1
+            tween(overlay, {BackgroundTransparency = CONFIG.OverlayTransparency}, CONFIG.TweenInfoShort)
+            -- bring default page visible
+            hideAllPages()
+            if pages["Main"] then pages["Main"].Visible = true end
+        end
+    end
+
+    local function hideMain()
+        if overlay.Visible then
+            tween(overlay, {BackgroundTransparency = 1}, CONFIG.TweenInfoShort)
+            -- Wait tween time then hide
+            delay(CONFIG.TweenInfoShort.Time, function()
+                if overlay then overlay.Visible = false; overlay.BackgroundTransparency = CONFIG.OverlayTransparency end
+            end)
+        end
+    end
+
+    miniBtn.MouseButton1Click:Connect(function()
+        if overlay.Visible then
+            hideMain()
+        else
+            showMain()
+        end
+    end)
+
+    -- close button behavior
+    closeBtn.MouseButton1Click:Connect(function()
+        hideMain()
+    end)
+
+    -- Clicking overlay background closes if clicked on overlay (not mainFrame)
+    overlay.InputBegan:Connect(function(input, processed)
+        if processed then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            -- Ensure that click.target is overlay (not main)
+            -- On some platforms InputBegan target unavailable; we fallback to pos check
+            local mouse = Players.LocalPlayer:GetMouse()
+            local mpos = Vector2.new(mouse.X, mouse.Y)
+            local absPos = mainFrame.AbsolutePosition
+            local absSize = mainFrame.AbsoluteSize
+            local insideMain = (mpos.X >= absPos.X and mpos.X <= absPos.X + absSize.X and mpos.Y >= absPos.Y and mpos.Y <= absPos.Y + absSize.Y)
+            if not insideMain then
+                hideMain()
+            end
+        end
+    end)
+
+    -- Keyboard toggle (optional) - RightShift toggles menu
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode.RightShift then
+            if overlay.Visible then hideMain() else showMain() end
+        end
+    end)
+
+    -- API returned to caller
+    local api = {}
+
+    -- AddTab API - allow external code to add tabs
+    function api:AddTab(name, customFrame)
+        if not name then return end
+        if pages[name] then
+            warn("[LoffyMenuLibrary] Tab already exists:", name)
+            return pages[name], buttonsMap[name]
+        end
+        local page = addTab(name)
+        if customFrame and customFrame:IsA("Frame") then
+            -- move children from customFrame into page
+            for _, child in ipairs(customFrame:GetChildren()) do
+                child.Parent = page
+            end
+            customFrame:Destroy()
+        end
+        return page, buttonsMap[name]
+    end
+
+    -- Toggle API
+    function api:Toggle()
+        if overlay.Visible then hideMain() else showMain() end
+    end
+
+    -- Open API
+    function api:Open()
+        showMain()
+    end
+
+    -- Close API
+    function api:Close()
+        hideMain()
+    end
+
+    -- Destroy API
+    function api:Destroy()
+        if miniGui and miniGui.Parent then miniGui:Destroy() end
+        if screenGui and screenGui.Parent then screenGui:Destroy() end
+    end
+
+    -- Handy getters
+    api.RootGui = screenGui
+    api.MiniGui = miniGui
+    api.Pages = pages
+    api.Tabs = buttonsMap
+    api.Overlay = overlay
+    api.MainFrame = mainFrame
+    api.MiniButton = miniBtn
+
+    return api
+end
+
+-- Public: CreateMenu(player) entry point
+function LoffyMenuLibrary:CreateMenu(player)
+    assert(player and player:IsA("Player"), "CreateMenu requires a Player instance")
+    local ok, result = pcall(function() return self:_buildUI(player) end)
+    if not ok then
+        warn("[LoffyMenuLibrary] Failed to create UI:", tostring(result))
+        return nil
+    end
+    return result
+end
+
+-- Allow calling module to return an instance or table
+setmetatable(LoffyMenuLibrary, {
+    __call = function(_, ...)
+        return setmetatable({}, LoffyMenuLibrary)
+    end
+})
+
+
+
+return LoffyMenuLibrary
